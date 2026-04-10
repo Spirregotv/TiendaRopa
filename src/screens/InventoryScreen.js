@@ -27,7 +27,7 @@ const EMPTY_FORM = {
   gender: 'mujer',
 };
 
-export default function InventoryScreen({ route }) {
+export default function InventoryScreen({ route, navigation }) {
   const { items, isAdmin, addItem, deleteItem, logout } = useInventory();
   const isManageMode = route?.params?.manageMode;
   const [showForm, setShowForm] = useState(false);
@@ -83,13 +83,9 @@ export default function InventoryScreen({ route }) {
         {isAdmin && isManageMode && (
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => setShowForm(!showForm)}
+            onPress={() => navigation.navigate('ProductForm')}
           >
-            <Ionicons
-              name={showForm ? 'close' : 'add'}
-              size={22}
-              color={Colors.textWhite}
-            />
+            <Ionicons name="add" size={22} color={Colors.textWhite} />
           </TouchableOpacity>
         )}
       </View>
@@ -212,6 +208,11 @@ export default function InventoryScreen({ route }) {
             item={item}
             showAdmin={isAdmin && isManageMode}
             onDelete={handleDelete}
+            onEdit={
+              isAdmin && isManageMode
+                ? () => navigation.navigate('ProductForm', { product: item })
+                : undefined
+            }
           />
         )}
         ListEmptyComponent={

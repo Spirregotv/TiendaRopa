@@ -151,6 +151,17 @@ export function InventoryProvider({ children }) {
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Deduct stock for each item in a confirmed order
+  const deductStock = (orderItems) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        const ordered = orderItems.find((o) => o.id === item.id);
+        if (!ordered) return item;
+        return { ...item, stock: Math.max(0, item.stock - ordered.quantity) };
+      })
+    );
+  };
+
   // --- Cart functions ---
   const addToCart = (itemId) => {
     setCart((prev) => {
@@ -248,6 +259,7 @@ export function InventoryProvider({ children }) {
         addItem,
         updateItem,
         deleteItem,
+        deductStock,
         loginAsAdmin,
         loginAsClient,
         registerClient,

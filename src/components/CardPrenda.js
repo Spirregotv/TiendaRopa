@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { APP_CONFIG } from '../constants/Config';
 
-export default function CardPrenda({ item, onDelete, showAdmin }) {
+export default function CardPrenda({ item, onDelete, onEdit, showAdmin }) {
   const isLowStock = item.stock < APP_CONFIG.lowStockThreshold;
   const margen =
     item.precioVenta > 0
@@ -53,13 +54,24 @@ export default function CardPrenda({ item, onDelete, showAdmin }) {
         </View>
       </View>
 
-      {showAdmin && onDelete && (
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => onDelete(item.id)}
-        >
-          <Text style={styles.deleteText}>Eliminar</Text>
-        </TouchableOpacity>
+      {showAdmin && (
+        <View style={styles.actionsRow}>
+          {onEdit && (
+            <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(item)}>
+              <Ionicons name="create-outline" size={15} color={Colors.accent} />
+              <Text style={styles.editText}>Editar</Text>
+            </TouchableOpacity>
+          )}
+          {onDelete && (
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => onDelete(item.id)}
+            >
+              <Ionicons name="trash-outline" size={15} color={Colors.danger} />
+              <Text style={styles.deleteText}>Eliminar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   );
@@ -143,10 +155,32 @@ const styles = StyleSheet.create({
   margenText: {
     color: Colors.success,
   },
-  deleteBtn: {
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
     marginTop: 14,
-    alignSelf: 'flex-end',
-    paddingHorizontal: 16,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  editText: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,

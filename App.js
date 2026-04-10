@@ -24,11 +24,14 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import InventoryScreen from './src/screens/InventoryScreen';
 import FinanceScreen from './src/screens/FinanceScreen';
+import OrdersScreen from './src/screens/Admin/OrdersScreen';
+import ProductFormScreen from './src/screens/Admin/ProductFormScreen';
 
 const AuthStack = createNativeStackNavigator();
 const ClientStack = createNativeStackNavigator();
 const ClientTab = createBottomTabNavigator();
 const AdminTab = createBottomTabNavigator();
+const AdminStack = createNativeStackNavigator();
 
 const TAB_STYLE = {
   headerShown: false,
@@ -128,8 +131,8 @@ function ClientNavigator() {
   );
 }
 
-// --- Admin Tabs (authenticated as admin) ---
-function AdminNavigator() {
+// --- Admin Tabs ---
+function AdminTabs() {
   return (
     <AdminTab.Navigator screenOptions={TAB_STYLE}>
       <AdminTab.Screen
@@ -138,6 +141,15 @@ function AdminNavigator() {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <AdminTab.Screen
+        name="Pedidos"
+        component={OrdersScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="receipt-outline" size={size} color={color} />
           ),
         }}
       />
@@ -159,17 +171,31 @@ function AdminNavigator() {
           ),
         }}
       />
-      <AdminTab.Screen
-        name="Gestión"
-        component={InventoryScreen}
-        initialParams={{ manageMode: true }}
+    </AdminTab.Navigator>
+  );
+}
+
+// --- Admin Stack (tabs + product form modal) ---
+function AdminNavigator() {
+  return (
+    <AdminStack.Navigator>
+      <AdminStack.Screen
+        name="AdminTabs"
+        component={AdminTabs}
+        options={{ headerShown: false }}
+      />
+      <AdminStack.Screen
+        name="ProductForm"
+        component={ProductFormScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
+          title: 'Nuevo Producto',
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.textPrimary,
+          headerShadowVisible: false,
+          animation: 'slide_from_bottom',
         }}
       />
-    </AdminTab.Navigator>
+    </AdminStack.Navigator>
   );
 }
 
