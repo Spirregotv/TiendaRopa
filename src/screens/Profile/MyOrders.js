@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../../constants/Colors';
 import { APP_CONFIG } from '../../constants/Config';
 import { useOrders } from '../../context/OrdersContext';
+import { useInventory } from '../../context/InventoryContext';
 
 // ─── Status config ──────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -207,10 +208,42 @@ const OrderCard = ({ order }) => {
 
 // ─── Main Screen ────────────────────────────────────────────────────────────
 export default function MyOrders({ navigation }) {
-  const { orders } = useOrders();
+  const { orders, getOrdersByUser } = useOrders();
+  const { userEmail } = useInventory();
+
+  /**
+   * Sincronización Bidireccional — useEffect como "listener"
+   *
+   * Cada vez que el administrador cambia el status de un pedido,
+   * `orders` en el contexto se actualiza y este useEffect dispara,
+   * filtrando los pedidos de este cliente y actualizando myOrders.
+   *
+   * Es el equivalente funcional de onSnapshot de Firebase:
+   *
+   *   // Con Firebase sería:
+   *   useEffect(() => {
+   *     const q = query(
+   *       collection(db, 'pedidos'),
+   *       where('userId', '==', userEmail),
+   *       orderBy('date', 'desc')
+   *     );
+   *     const unsubscribe = onSnapshot(q, (snap) => {
+   *       setMyOrders(snap.docs.map(d => ({ orderId: d.id, ...d.data() })));
+   *     });
+   *     return () => unsubscribe(); // cleanup al desmontar
+   *   }, [userEmail]);
+   */
+  const [myOrders, setMyOrders] = useState([]);
+
+  useEffect(() => {
+    const filtered = userEmail
+      ? getOrdersByUser(userEmail)
+      : orders; // fallback: mostrar todos si no hay email
+    setMyOrders(filtered);
+  }, [orders, userEmail]); // <-- 'orders' cambia cuando el admin actualiza un estado
 
   // Empty state
-  if (orders.length === 0) {
+  if (myOrders.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.emptyContainer}>
@@ -238,22 +271,22 @@ export default function MyOrders({ navigation }) {
       {/* Summary header */}
       <View style={styles.summaryBar}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber}>{orders.length}</Text>
+          <Text style={styles.summaryNumber}>{myOrders.length}</Text>
           <Text style={styles.summaryLabel}>
-            Pedido{orders.length !== 1 ? 's' : ''}
+            Pedido{myOrders.length !== 1 ? 's' : ''}
           </Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryNumber}>
-            {orders.filter((o) => o.status === 'Entregado').length}
+            {myOrders.filter((o) => o.status === 'Entregado').length}
           </Text>
           <Text style={styles.summaryLabel}>Entregados</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNumber, { color: Colors.warning }]}>
-            {orders.filter((o) => o.status === 'Pendiente de Pago').length}
+            {myOrders.filter((o) => o.status === 'Pendiente de Pago').length}
           </Text>
           <Text style={styles.summaryLabel}>Pendientes</Text>
         </View>
@@ -263,7 +296,7 @@ export default function MyOrders({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {orders.map((order) => (
+        {myOrders.map((order) => (
           <OrderCard key={order.orderId} order={order} />
         ))}
       </ScrollView>

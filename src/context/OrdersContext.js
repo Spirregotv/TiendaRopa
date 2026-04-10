@@ -1,5 +1,53 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import { APP_CONFIG } from '../constants/Config';
+
+/**
+ * ─── ESTRUCTURA DE BASE DE DATOS ───────────────────────────────────────────
+ *
+ * Colección: 'pedidos'
+ * {
+ *   orderId:       string,          // "MAS-123456-789"
+ *   userId:        string,          // email del cliente
+ *   status:        string,          // "Pendiente de Pago" | "Pago Recibido" | ...
+ *   items: [{
+ *     id:          string,          // referencia al producto en inventario
+ *     nombre:      string,
+ *     talla:       string,
+ *     precioVenta: number,
+ *     imageUrl:    string,
+ *     quantity:    number,
+ *   }],
+ *   total:         number,
+ *   subtotal:      number,
+ *   shippingCost:  number,
+ *   paymentMethod: string,
+ *   paymentRef:    string | null,
+ *   address:       { calle, numero, codigoPostal, ciudad },
+ *   date:          ISO string,
+ * }
+ *
+ * Colección: 'productos'
+ * {
+ *   id:                string,
+ *   nombre:            string,
+ *   stock:             number,      ← campo clave para la transacción
+ *   precioVenta:       number,
+ *   costoAdquisicion:  number,
+ *   categoria:         string,
+ *   tallasDisponibles: string[],
+ *   imageUrl:          string,
+ * }
+ *
+ * ── Con Firebase se reemplazaría useState por onSnapshot: ───────────────────
+ * useEffect(() => {
+ *   const q = query(collection(db, 'pedidos'), orderBy('date', 'desc'));
+ *   const unsubscribe = onSnapshot(q, (snap) => {
+ *     setOrders(snap.docs.map(d => ({ orderId: d.id, ...d.data() })));
+ *   });
+ *   return () => unsubscribe();
+ * }, []);
+ * ───────────────────────────────────────────────────────────────────────────
+ */
 
 const OrdersContext = createContext();
 
@@ -75,6 +123,53 @@ export function OrdersProvider({ children }) {
     );
   };
 
+  /**
+   * confirmarPago — Transacción atómica de inventario
+   *
+   * 1. Valida que haya stock suficiente para TODOS los productos del pedido
+   *    antes de mutar cualquier dato (validación pre-commit).
+   * 2. Si alguno falla, lanza un Error descriptivo y no modifica nada.
+   * 3. Si pasa la validación, descuenta el stock y cambia el estado.
+   *
+   * @param {string}   pedidoId      - ID del pedido a confirmar
+   * @param {Array}    inventoryItems - Lista actual de productos (de InventoryContext)
+   * @param {Function} deductStockFn  - Función deductStock de InventoryContext
+   * @throws {Error} si el stock es insuficiente o el pedido no existe
+   */
+  const confirmarPago = useCallback(
+    async (pedidoId, inventoryItems, deductStockFn) => {
+      // Buscar el pedido
+      const pedido = orders.find((o) => o.orderId === pedidoId);
+      if (!pedido) throw new Error('Pedido no encontrado.');
+      if (pedido.status !== 'Pendiente de Pago') {
+        throw new Error('Este pedido ya fue procesado anteriormente.');
+      }
+
+      // ── Fase 1: Validación completa antes de cualquier mutación ──────────
+      const problemas = [];
+      for (const orderItem of pedido.items) {
+        const producto = inventoryItems.find((p) => p.id === orderItem.id);
+        if (!producto) {
+          problemas.push(`"${orderItem.nombre}" ya no existe en inventario.`);
+        } else if (producto.stock < orderItem.quantity) {
+          problemas.push(
+            `"${orderItem.nombre}": necesitas ${orderItem.quantity} unidad(es), ` +
+              `solo hay ${producto.stock} en stock.`
+          );
+        }
+      }
+
+      if (problemas.length > 0) {
+        throw new Error(`Stock insuficiente:\n\n${problemas.join('\n')}`);
+      }
+
+      // ── Fase 2: Commit — descontar stock y cambiar estado ────────────────
+      deductStockFn(pedido.items);
+      updateOrderStatus(pedidoId, 'Pago Recibido');
+    },
+    [orders]
+  );
+
   // Filter orders by userId (for client profile)
   const getOrdersByUser = (userId) => orders.filter((o) => o.userId === userId);
 
@@ -110,7 +205,7 @@ export function OrdersProvider({ children }) {
 
   return (
     <OrdersContext.Provider
-      value={{ orders, orderStats, placeOrder, updateOrderStatus, getOrdersByUser }}
+      value={{ orders, orderStats, placeOrder, updateOrderStatus, getOrdersByUser, confirmarPago }}
     >
       {children}
     </OrdersContext.Provider>

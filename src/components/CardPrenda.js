@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { APP_CONFIG } from '../constants/Config';
+import StockAlert from './StockAlert';
 
 export default function CardPrenda({ item, onDelete, onEdit, showAdmin }) {
   const isLowStock = item.stock < APP_CONFIG.lowStockThreshold;
@@ -18,12 +19,16 @@ export default function CardPrenda({ item, onDelete, onEdit, showAdmin }) {
           <Text style={styles.nombre}>{item.nombre}</Text>
           <Text style={styles.talla}>Talla {item.talla}</Text>
         </View>
-        {isLowStock && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>RESTOCK REQUERIDO</Text>
-          </View>
-        )}
+        {/* StockAlert compact: rojo si stock=0, naranja si stock<5 */}
+        <StockAlert stock={item.stock} compact />
       </View>
+
+      {/* Alerta de stock expandida debajo del header */}
+      {item.stock < 5 && (
+        <View style={{ marginBottom: 10 }}>
+          <StockAlert stock={item.stock} />
+        </View>
+      )}
 
       <View style={styles.divider} />
 
