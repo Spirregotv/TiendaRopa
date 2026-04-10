@@ -84,7 +84,8 @@ export default function OrderCard({ order, expanded = false }) {
         // Usa la transacción atómica con validación de stock
         await confirmarPago(order.orderId, inventoryItems, deductStock);
       } else {
-        updateOrderStatus(order.orderId, action.next);
+        // Pasar inventoryItems para que al llegar a "Entregado" se archive con costos
+        updateOrderStatus(order.orderId, action.next, inventoryItems);
       }
     } catch (err) {
       Alert.alert('No se pudo procesar', err.message, [{ text: 'Entendido' }]);

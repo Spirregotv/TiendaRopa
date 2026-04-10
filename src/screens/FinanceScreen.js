@@ -8,26 +8,40 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { APP_CONFIG } from '../constants/Config';
 import { useInventory } from '../context/InventoryContext';
 import { useOrders } from '../context/OrdersContext';
+import { useSalesHistory } from '../context/SalesHistoryContext';
 import AdminHeader from '../components/AdminHeader';
 import FinanceChart from '../components/FinanceChart';
 
+const fmt = (n) =>
+  APP_CONFIG.currency +
+  (n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+
 export default function FinanceScreen() {
-  const { financials, logout } = useInventory();
-  const { orderStats, updateOrderStatus } = useOrders();
+  const { financials, logout, items: inventoryItems } = useInventory();
+  const { orderStats, updateOrderStatus, confirmarPago } = useOrders();
+  const { sales, salesStats } = useSalesHistory();
+  const { deductStock } = useInventory();
 
   const handleConfirmOrder = (orderId) => {
     Alert.alert(
-      'Confirmar Pedido',
-      '¿Marcar este pedido como pagado/confirmado?',
+      'Confirmar Pago',
+      '¿Confirmar que recibiste el pago? El stock se descontará automáticamente.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Confirmar',
-          onPress: () => updateOrderStatus(orderId, 'Confirmado'),
+          onPress: async () => {
+            try {
+              await confirmarPago(orderId, inventoryItems, deductStock);
+            } catch (e) {
+              Alert.alert('Error', e.message);
+            }
+          },
         },
       ]
     );
@@ -45,24 +59,121 @@ export default function FinanceScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Dashboard Financiero</Text>
           <Text style={styles.subtitle}>
-            Resumen de inversión y proyección de ganancias
+            Inversión, proyección y ventas históricas
           </Text>
         </View>
 
         <View style={styles.content}>
-          {/* Pending Sales Alert */}
+          {/* ── Balance General ── */}
+          <View style={styles.balanceRow}>
+            <BalanceCard
+              label="Ingresos Confirmados"
+              value={fmt(orderStats.totalRevenue)}
+              icon="trending-up"
+              color={Colors.success}
+            />
+            <BalanceCard
+              label="Ventas Históricas"
+              value={fmt(salesStats.totalRevenue)}
+              icon="archive"
+              color="#007185"
+            />
+          </View>
+          <View style={styles.balanceRow}>
+            <BalanceCard
+              label="Ganancia Neta"
+              value={fmt(salesStats.netProfit)}
+              icon="wallet"
+              color={salesStats.netProfit >= 0 ? Colors.success : Colors.danger}
+            />
+            <BalanceCard
+              label="Margen Global"
+              value={`${salesStats.marginPercent.toFixed(1)}%`}
+              icon="pie-chart"
+              color={Colors.accent}
+            />
+          </View>
+
+          {/* ── Ventas Completadas (Historial Inmutable) ── */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="shield-checkmark" size={18} color="#067D62" />
+              <Text style={styles.sectionTitle}>
+                Historial de Ventas ({salesStats.totalSales})
+              </Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>
+              Registro inmutable — los pedidos completados no pueden modificarse
+            </Text>
+
+            {sales.length === 0 ? (
+              <Text style={styles.noDataText}>
+                Aún no hay ventas completadas. Cuando un pedido llegue a
+                "Entregado" se archivará aquí automáticamente.
+              </Text>
+            ) : (
+              <>
+                {/* Top productos vendidos */}
+                {salesStats.topProducts.length > 0 && (
+                  <View style={styles.topProducts}>
+                    <Text style={styles.miniLabel}>Top Productos</Text>
+                    {salesStats.topProducts.map((p, i) => (
+                      <View key={i} style={styles.topRow}>
+                        <Text style={styles.topRank}>#{i + 1}</Text>
+                        <Text style={styles.topName} numberOfLines={1}>
+                          {p.nombre}
+                        </Text>
+                        <Text style={styles.topUnits}>{p.unitsCount} uds</Text>
+                        <Text style={styles.topRevenue}>{fmt(p.revenue)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Últimas 5 ventas */}
+                <Text style={styles.miniLabel}>Últimas Ventas Archivadas</Text>
+                {sales.slice(0, 5).map((sale) => (
+                  <View key={sale.orderId} style={styles.saleRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.saleId}>#{sale.orderId}</Text>
+                      <Text style={styles.saleDate}>
+                        {new Date(sale.orderDate).toLocaleDateString('es-MX', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}{' '}
+                        · {sale.items.length} productos
+                      </Text>
+                    </View>
+                    <View style={styles.saleAmountBox}>
+                      <Text style={styles.saleAmount}>{fmt(sale.total)}</Text>
+                      <Ionicons
+                        name="lock-closed"
+                        size={10}
+                        color={Colors.textLight}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+
+          {/* ── Pending Sales Alert ── */}
           {orderStats.pendingCount > 0 && (
             <View style={styles.pendingCard}>
               <View style={styles.pendingHeader}>
                 <View style={styles.pendingIconCircle}>
-                  <Text style={styles.bellIcon}>🔔</Text>
+                  <Ionicons name="time-outline" size={20} color="#8B6914" />
                 </View>
                 <View style={styles.pendingHeaderInfo}>
                   <Text style={styles.pendingTitle}>
-                    {orderStats.pendingCount} Venta{orderStats.pendingCount > 1 ? 's' : ''} Pendiente{orderStats.pendingCount > 1 ? 's' : ''}
+                    {orderStats.pendingCount} Venta
+                    {orderStats.pendingCount > 1 ? 's' : ''} Pendiente
+                    {orderStats.pendingCount > 1 ? 's' : ''}
                   </Text>
                   <Text style={styles.pendingAmount}>
-                    Total: {APP_CONFIG.currency}{orderStats.pendingTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    Total: {fmt(orderStats.pendingTotal)}
                   </Text>
                 </View>
               </View>
@@ -70,40 +181,56 @@ export default function FinanceScreen() {
               {orderStats.pendingOrders.map((order) => (
                 <View key={order.orderId} style={styles.pendingOrderRow}>
                   <View style={styles.pendingOrderInfo}>
-                    <Text style={styles.pendingOrderId}>#{order.orderId}</Text>
+                    <Text style={styles.pendingOrderId}>
+                      #{order.orderId}
+                    </Text>
                     <Text style={styles.pendingOrderMeta}>
-                      {order.paymentMethod} · {new Date(order.date).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}
+                      {order.paymentMethod} ·{' '}
+                      {new Date(order.date).toLocaleDateString('es-MX', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </Text>
                   </View>
                   <Text style={styles.pendingOrderTotal}>
-                    {APP_CONFIG.currency}{order.total.toLocaleString()}
+                    {fmt(order.total)}
                   </Text>
                   <TouchableOpacity
                     style={styles.confirmOrderBtn}
                     onPress={() => handleConfirmOrder(order.orderId)}
                   >
-                    <Text style={styles.confirmOrderText}>Dar Alta</Text>
+                    <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                    <Text style={styles.confirmOrderText}>Confirmar</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
           )}
 
-          {/* Confirmed Sales Summary */}
-          {orderStats.confirmedCount > 0 && (
+          {/* ── Confirmed Sales Summary ── */}
+          {orderStats.receivedCount > 0 && (
             <View style={styles.confirmedCard}>
-              <Text style={styles.confirmedTitle}>
-                ✅ {orderStats.confirmedCount} Venta{orderStats.confirmedCount > 1 ? 's' : ''} Confirmada{orderStats.confirmedCount > 1 ? 's' : ''}
-              </Text>
+              <View style={styles.confirmedLeft}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={18}
+                  color="#067D62"
+                />
+                <Text style={styles.confirmedTitle}>
+                  {orderStats.receivedCount} Venta
+                  {orderStats.receivedCount > 1 ? 's' : ''} Confirmada
+                  {orderStats.receivedCount > 1 ? 's' : ''}
+                </Text>
+              </View>
               <Text style={styles.confirmedAmount}>
-                {APP_CONFIG.currency}{orderStats.confirmedTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                {fmt(orderStats.confirmedTotal)}
               </Text>
             </View>
           )}
 
           <FinanceChart financials={financials} />
 
-          {/* Per-item margin table */}
+          {/* ── Per-item margin table ── */}
           <View style={styles.tableCard}>
             <Text style={styles.tableTitle}>Margen por Producto</Text>
             <View style={styles.tableHeader}>
@@ -118,10 +245,12 @@ export default function FinanceScreen() {
                   {item.nombre}
                 </Text>
                 <Text style={styles.td}>
-                  {APP_CONFIG.currency}{item.costoAdquisicion}
+                  {APP_CONFIG.currency}
+                  {item.costoAdquisicion}
                 </Text>
                 <Text style={styles.td}>
-                  {APP_CONFIG.currency}{item.precioVenta}
+                  {APP_CONFIG.currency}
+                  {item.precioVenta}
                 </Text>
                 <Text
                   style={[
@@ -143,7 +272,7 @@ export default function FinanceScreen() {
             ))}
           </View>
 
-          {/* Formulas Reference */}
+          {/* ── Formulas Reference ── */}
           <View style={styles.formulasCard}>
             <Text style={styles.formulasTitle}>Fórmulas Aplicadas</Text>
             <View style={styles.formulaItem}>
@@ -164,9 +293,27 @@ export default function FinanceScreen() {
                 (precio_venta - costo_adquisición) / precio_venta × 100
               </Text>
             </View>
+            <View style={styles.formulaItem}>
+              <Text style={styles.formulaName}>Ganancia Neta</Text>
+              <Text style={styles.formulaDesc}>
+                ingresos_ventas - costo_total - costos_envío
+              </Text>
+            </View>
           </View>
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function BalanceCard({ label, value, icon, color }) {
+  return (
+    <View style={styles.balanceCard}>
+      <View style={[styles.balanceIcon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon} size={18} color={color} />
+      </View>
+      <Text style={[styles.balanceValue, { color }]}>{value}</Text>
+      <Text style={styles.balanceLabel}>{label}</Text>
     </View>
   );
 }
@@ -199,6 +346,148 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
+  // Balance cards
+  balanceRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  balanceCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  balanceIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  balanceLabel: {
+    fontSize: 10,
+    color: Colors.textLight,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  // Section card
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    color: Colors.textLight,
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  noDataText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  miniLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textLight,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  topProducts: {
+    gap: 4,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    gap: 8,
+  },
+  topRank: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.accent,
+    width: 24,
+  },
+  topName: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  topUnits: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  topRevenue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    minWidth: 70,
+    textAlign: 'right',
+  },
+  saleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    gap: 8,
+  },
+  saleId: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  saleDate: {
+    fontSize: 11,
+    color: Colors.textLight,
+    marginTop: 2,
+  },
+  saleAmountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  saleAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  // Table
   tableCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
@@ -244,6 +533,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textPrimary,
   },
+  // Formulas
   formulasCard: {
     backgroundColor: Colors.surfaceAlt,
     borderRadius: 16,
@@ -295,7 +585,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bellIcon: { fontSize: 20 },
   pendingHeaderInfo: { flex: 1, gap: 2 },
   pendingTitle: { fontSize: 16, fontWeight: '700', color: '#8B6914' },
   pendingAmount: { fontSize: 13, fontWeight: '500', color: '#8B6914' },
@@ -308,10 +597,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pendingOrderInfo: { flex: 1, gap: 2 },
-  pendingOrderId: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
+  pendingOrderId: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
   pendingOrderMeta: { fontSize: 11, color: Colors.textSecondary },
-  pendingOrderTotal: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginRight: 8 },
+  pendingOrderTotal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginRight: 8,
+  },
   confirmOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#067D62',
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -327,6 +628,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  confirmedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   confirmedTitle: { fontSize: 14, fontWeight: '600', color: '#067D62' },
   confirmedAmount: { fontSize: 16, fontWeight: '700', color: '#067D62' },

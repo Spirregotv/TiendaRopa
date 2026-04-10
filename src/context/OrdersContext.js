@@ -116,12 +116,61 @@ export function OrdersProvider({ children }) {
     return newOrder;
   };
 
-  // Admin: update order status
-  const updateOrderStatus = (orderId, newStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.orderId === orderId ? { ...o, status: newStatus } : o))
-    );
+  // Callback ref para SalesHistory — se inyecta desde App.js via setArchiveFn
+  const archiveFnRef = React.useRef(null);
+  const setArchiveFn = useCallback((fn) => {
+    archiveFnRef.current = fn;
+  }, []);
+
+  /**
+   * Admin: update order status.
+   *
+   * Si el nuevo estado es "Entregado", archiva automáticamente el pedido
+   * en SalesHistory (colección inmutable de ventas completadas).
+   *
+   * @param {string} orderId
+   * @param {string} newStatus
+   * @param {Array}  [inventoryItems] - productos del inventario para enriquecer el archivo
+   */
+  const updateOrderStatus = (orderId, newStatus, inventoryItems = []) => {
+    setOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.orderId === orderId ? { ...o, status: newStatus } : o
+      );
+
+      // Archivado automático al completar entrega
+      if (newStatus === 'Entregado' && archiveFnRef.current) {
+        const order = updated.find((o) => o.orderId === orderId);
+        if (order) archiveFnRef.current(order, inventoryItems);
+      }
+
+      return updated;
+    });
   };
+
+  /**
+   * Lógica de No-Borrado:
+   * Los pedidos con status "Entregado" o archivados NO pueden eliminarse.
+   * Solo pedidos "Cancelado" o "Pendiente de Pago" se pueden remover.
+   */
+  const deleteOrder = useCallback(
+    (orderId) => {
+      const order = orders.find((o) => o.orderId === orderId);
+      if (!order) return { success: false, error: 'Pedido no encontrado.' };
+
+      const protectedStatuses = ['Pago Recibido', 'En Preparación', 'Enviado', 'Entregado'];
+      if (protectedStatuses.includes(order.status)) {
+        return {
+          success: false,
+          error: `No se puede eliminar un pedido en estado "${order.status}". Los pedidos confirmados son inmutables.`,
+        };
+      }
+
+      setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+      return { success: true };
+    },
+    [orders]
+  );
 
   /**
    * confirmarPago — Transacción atómica de inventario
@@ -205,7 +254,7 @@ export function OrdersProvider({ children }) {
 
   return (
     <OrdersContext.Provider
-      value={{ orders, orderStats, placeOrder, updateOrderStatus, getOrdersByUser, confirmarPago }}
+      value={{ orders, orderStats, placeOrder, updateOrderStatus, getOrdersByUser, confirmarPago, deleteOrder, setArchiveFn }}
     >
       {children}
     </OrdersContext.Provider>

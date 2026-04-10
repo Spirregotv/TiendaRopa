@@ -162,6 +162,30 @@ export function InventoryProvider({ children }) {
     );
   };
 
+  /**
+   * validateStock — Verifica que hay stock suficiente para todos los items.
+   *
+   * Retorna { valid: true } o { valid: false, problems: string[] }
+   * Se usa ANTES de placeOrder para bloquear compras sin stock.
+   */
+  const validateStock = (orderItems) => {
+    const problems = [];
+    for (const orderItem of orderItems) {
+      const product = items.find((p) => p.id === orderItem.id);
+      if (!product) {
+        problems.push(`"${orderItem.nombre || orderItem.itemId}" ya no existe.`);
+      } else if (product.stock < (orderItem.quantity || 1)) {
+        problems.push(
+          `"${product.nombre}": necesitas ${orderItem.quantity || 1}, ` +
+            `solo hay ${product.stock} en stock.`
+        );
+      }
+    }
+    return problems.length === 0
+      ? { valid: true, problems: [] }
+      : { valid: false, problems };
+  };
+
   // --- Cart functions ---
   const addToCart = (itemId) => {
     setCart((prev) => {
@@ -260,6 +284,7 @@ export function InventoryProvider({ children }) {
         updateItem,
         deleteItem,
         deductStock,
+        validateStock,
         loginAsAdmin,
         loginAsClient,
         registerClient,

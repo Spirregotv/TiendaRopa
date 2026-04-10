@@ -5,8 +5,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { InventoryProvider, useInventory } from './src/context/InventoryContext';
-import { OrdersProvider } from './src/context/OrdersContext';
-import { ProfileProvider } from './src/context/ProfileContext'; // ✅ NUEVO
+import { OrdersProvider, useOrders } from './src/context/OrdersContext';
+import { ProfileProvider } from './src/context/ProfileContext';
+import { SalesHistoryProvider, useSalesHistory } from './src/context/SalesHistoryContext';
 import Colors from './src/constants/Colors';
 
 // Auth screens
@@ -199,6 +200,18 @@ function AdminNavigator() {
   );
 }
 
+// --- Bridge: connects OrdersContext with SalesHistoryContext ---
+function SalesHistoryBridge({ children }) {
+  const { setArchiveFn } = useOrders();
+  const { archiveSale } = useSalesHistory();
+
+  React.useEffect(() => {
+    setArchiveFn(archiveSale);
+  }, [archiveSale, setArchiveFn]);
+
+  return children;
+}
+
 // --- Root: Conditional navigation based on userRole ---
 function RootNavigator() {
   const { userRole } = useInventory();
@@ -218,11 +231,15 @@ export default function App() {
   return (
     <InventoryProvider>
       <OrdersProvider>
-        <ProfileProvider>
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
-        </ProfileProvider>
+        <SalesHistoryProvider>
+          <ProfileProvider>
+            <SalesHistoryBridge>
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            </SalesHistoryBridge>
+          </ProfileProvider>
+        </SalesHistoryProvider>
       </OrdersProvider>
     </InventoryProvider>
   );

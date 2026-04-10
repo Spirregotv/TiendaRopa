@@ -33,7 +33,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function CheckoutScreen({ navigation }) {
-  const { cartDetails, clearCart, userEmail } = useInventory();
+  const { cartDetails, clearCart, userEmail, validateStock, deductStock } = useInventory();
   const { placeOrder } = useOrders();
   // ✅ useProfile → datos guardados del perfil + AsyncStorage
   const {
@@ -191,6 +191,23 @@ export default function CheckoutScreen({ navigation }) {
 
   // ─── handleConfirmOrder + handleSaveData ──────────────────────────────────
   const handleConfirmOrder = async () => {
+    // ── Validación de stock antes de cualquier mutación ──────────────────
+    const stockCheck = validateStock(cartItems);
+    if (!stockCheck.valid) {
+      Alert.alert(
+        'Stock insuficiente',
+        stockCheck.problems.join('\n\n') +
+          '\n\nAlgunos productos se agotaron mientras comprabas.',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
+
+    // ── Si paga con tarjeta → descontar stock inmediatamente ────────────
+    if (paymentMethod === 'card') {
+      deductStock(cartItems);
+    }
+
     const order = placeOrder({
       items: cartItems,
       total,
@@ -198,7 +215,7 @@ export default function CheckoutScreen({ navigation }) {
       shippingCost,
       paymentMethod,
       address,
-      userId: userEmail, // ✅ Asociar pedido al usuario actual
+      userId: userEmail,
     });
 
     // ✅ handleSaveData: al confirmar compra, guardar datos en el perfil + AsyncStorage
