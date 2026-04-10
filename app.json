@@ -24,6 +24,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite a FashionFlow acceder a tus fotos para subir imágenes de productos.",
+          "cameraPermission": "Permite a FashionFlow usar la cámara para tomar fotos de productos."
+        }
+      ]
+    ]
   }
 }
