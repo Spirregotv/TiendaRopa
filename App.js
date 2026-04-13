@@ -29,6 +29,7 @@ import FinanceScreen from './src/screens/FinanceScreen';
 import OrdersScreen from './src/screens/Admin/OrdersScreen';
 import ProductFormScreen from './src/screens/Admin/ProductFormScreen';
 
+const RootStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 const ClientStack = createNativeStackNavigator();
 const ClientTab = createBottomTabNavigator();
@@ -247,12 +248,12 @@ function SalesHistoryBridge({ children }) {
 }
 
 // --- Root: Conditional navigation based on userRole ---
+// Usa un Stack raíz único para que React Navigation pueda hacer la transición
+// correctamente entre Auth/Admin/Client cuando cambia el estado de sesión.
+// (Patrón oficial de RN: https://reactnavigation.org/docs/auth-flow)
 function RootNavigator() {
   const { userRole, isHydrated } = useInventory();
 
-  // Esperar a que AsyncStorage cargue la sesión antes de decidir el navigator.
-  // Sin esto, userRole empieza en null → muestra login → luego salta al rol
-  // correcto, lo que causa el flash y la confusión de "me mandó al admin".
   if (!isHydrated) {
     return (
       <View style={styles.loadingContainer}>
@@ -261,15 +262,17 @@ function RootNavigator() {
     );
   }
 
-  if (userRole === null) {
-    return <AuthNavigator />;
-  }
-
-  if (userRole === 'admin') {
-    return <AdminNavigator />;
-  }
-
-  return <ClientNavigator />;
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
+      {userRole === null ? (
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      ) : userRole === 'admin' ? (
+        <RootStack.Screen name="Admin" component={AdminNavigator} />
+      ) : (
+        <RootStack.Screen name="Client" component={ClientNavigator} />
+      )}
+    </RootStack.Navigator>
+  );
 }
 
 const styles = StyleSheet.create({
