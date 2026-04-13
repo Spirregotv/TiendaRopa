@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, Alert, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -133,26 +133,30 @@ function ClientNavigator() {
   );
 }
 
-// Placeholder vacío para el tab de logout (nunca se renderiza)
-function LogoutPlaceholder() {
-  return <View />;
-}
-
-// --- Admin Tabs ---
-function AdminTabs() {
+// Tab "Salir": muestra el Alert al montar y redirige al Inicio si cancela
+function LogoutPlaceholder({ navigation }) {
   const { logout } = useInventory();
 
-  const handleLogout = () => {
+  React.useEffect(() => {
     Alert.alert(
       'Cerrar sesión',
       '¿Deseas cerrar sesión como administrador?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+          onPress: () => navigation.navigate('Inicio'),
+        },
         { text: 'Cerrar sesión', style: 'destructive', onPress: logout },
       ]
     );
-  };
+  }, []);
 
+  return <View style={{ flex: 1, backgroundColor: Colors.background }} />;
+}
+
+// --- Admin Tabs ---
+function AdminTabs() {
   return (
     <AdminTab.Navigator screenOptions={TAB_STYLE}>
       <AdminTab.Screen
@@ -200,13 +204,6 @@ function AdminTabs() {
           ),
           tabBarLabel: 'Salir',
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600', color: Colors.danger },
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...props}
-              onPress={handleLogout}
-              style={[props.style, styles.logoutTab]}
-            />
-          ),
         }}
       />
     </AdminTab.Navigator>
@@ -281,11 +278,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.background,
-  },
-  logoutTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
 
