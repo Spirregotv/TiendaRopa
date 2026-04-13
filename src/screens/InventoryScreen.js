@@ -28,8 +28,8 @@ const EMPTY_FORM = {
 };
 
 export default function InventoryScreen({ route, navigation }) {
-  const { items, isAdmin, addItem, deleteItem, logout } = useInventory();
-  const isManageMode = route?.params?.manageMode;
+  const { items, isAdmin, addItem, deleteItem, logout, financials } = useInventory();
+  const isManageMode = isAdmin; // Always manage mode when admin
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -77,7 +77,7 @@ export default function InventoryScreen({ route, navigation }) {
           </Text>
           <Text style={styles.subtitle}>
             {items.length} productos · {items.reduce((s, i) => s + i.stock, 0)}{' '}
-            unidades
+            unidades{financials.agotados > 0 ? ` · ${financials.agotados} agotados` : ''}
           </Text>
         </View>
         {isAdmin && isManageMode && (

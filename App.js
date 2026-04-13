@@ -1,12 +1,14 @@
 import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { InventoryProvider, useInventory } from './src/context/InventoryContext';
-import { OrdersProvider } from './src/context/OrdersContext';
-import { ProfileProvider } from './src/context/ProfileContext'; // ✅ NUEVO
+import { OrdersProvider, useOrders } from './src/context/OrdersContext';
+import { ProfileProvider } from './src/context/ProfileContext';
+import { SalesHistoryProvider, useSalesHistory } from './src/context/SalesHistoryContext';
 import Colors from './src/constants/Colors';
 
 // Auth screens
@@ -27,6 +29,7 @@ import FinanceScreen from './src/screens/FinanceScreen';
 import OrdersScreen from './src/screens/Admin/OrdersScreen';
 import ProductFormScreen from './src/screens/Admin/ProductFormScreen';
 
+const RootStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 const ClientStack = createNativeStackNavigator();
 const ClientTab = createBottomTabNavigator();
@@ -199,30 +202,68 @@ function AdminNavigator() {
   );
 }
 
-// --- Root: Conditional navigation based on userRole ---
-function RootNavigator() {
-  const { userRole } = useInventory();
+// --- Bridge: connects OrdersContext with SalesHistoryContext ---
+function SalesHistoryBridge({ children }) {
+  const { setArchiveFn } = useOrders();
+  const { archiveSale } = useSalesHistory();
 
-  if (userRole === null) {
-    return <AuthNavigator />;
-  }
+  React.useEffect(() => {
+    setArchiveFn(archiveSale);
+  }, [archiveSale, setArchiveFn]);
 
-  if (userRole === 'admin') {
-    return <AdminNavigator />;
-  }
-
-  return <ClientNavigator />;
+  return children;
 }
+
+// --- Root: Conditional navigation based on userRole ---
+// Usa un Stack raíz único para que React Navigation pueda hacer la transición
+// correctamente entre Auth/Admin/Client cuando cambia el estado de sesión.
+// (Patrón oficial de RN: https://reactnavigation.org/docs/auth-flow)
+function RootNavigator() {
+  const { userRole, isHydrated } = useInventory();
+
+  if (!isHydrated) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
+      {userRole === null ? (
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      ) : userRole === 'admin' ? (
+        <RootStack.Screen name="Admin" component={AdminNavigator} />
+      ) : (
+        <RootStack.Screen name="Client" component={ClientNavigator} />
+      )}
+    </RootStack.Navigator>
+  );
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+});
 
 export default function App() {
   return (
     <InventoryProvider>
       <OrdersProvider>
-        <ProfileProvider>
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
-        </ProfileProvider>
+        <SalesHistoryProvider>
+          <ProfileProvider>
+            <SalesHistoryBridge>
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            </SalesHistoryBridge>
+          </ProfileProvider>
+        </SalesHistoryProvider>
       </OrdersProvider>
     </InventoryProvider>
   );

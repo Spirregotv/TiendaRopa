@@ -34,15 +34,27 @@ export default function ProductFormScreen({ navigation, route }) {
   const [costo, setCosto] = useState(
     editingProduct ? String(editingProduct.costoAdquisicion) : ''
   );
-  const [stock, setStock] = useState(
-    editingProduct ? String(editingProduct.stock) : ''
-  );
   const [categoria, setCategoria] = useState(
     editingProduct?.categoria ?? 'mujer'
   );
+
+  // ── Variantes por talla con stock individual ──────────────────────────
   const [tallasSeleccionadas, setTallasSeleccionadas] = useState(
     editingProduct?.tallasDisponibles ?? ['M']
   );
+
+  // stockPorTalla: { S: "5", M: "10", ... } — strings para TextInput
+  const [stockPorTalla, setStockPorTalla] = useState(() => {
+    if (editingProduct?.stockPorTalla) {
+      const obj = {};
+      for (const [k, v] of Object.entries(editingProduct.stockPorTalla)) {
+        obj[k] = String(v);
+      }
+      return obj;
+    }
+    return { M: '0' };
+  });
+
   const [images, setImages] = useState(
     editingProduct?.gallery?.length
       ? editingProduct.gallery
@@ -59,12 +71,35 @@ export default function ProductFormScreen({ navigation, route }) {
     });
   }, [isEditing]);
 
+  // Sync stockPorTalla when tallas change
   const toggleTalla = (talla) => {
-    setTallasSeleccionadas((prev) =>
-      prev.includes(talla) ? prev.filter((t) => t !== talla) : [...prev, talla]
-    );
+    setTallasSeleccionadas((prev) => {
+      const exists = prev.includes(talla);
+      if (exists) {
+        // Al quitar talla, eliminar su stock
+        setStockPorTalla((s) => {
+          const copy = { ...s };
+          delete copy[talla];
+          return copy;
+        });
+        return prev.filter((t) => t !== talla);
+      }
+      // Al agregar talla, inicializar su stock en 0
+      setStockPorTalla((s) => ({ ...s, [talla]: '0' }));
+      return [...prev, talla];
+    });
   };
 
+  const updateTallaStock = (talla, value) => {
+    setStockPorTalla((prev) => ({ ...prev, [talla]: value }));
+  };
+
+  const totalStock = Object.values(stockPorTalla).reduce(
+    (sum, v) => sum + (parseInt(v, 10) || 0),
+    0
+  );
+
+  // ── Image picker ──────────────────────────────────────────────────────
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -92,6 +127,7 @@ export default function ProductFormScreen({ navigation, route }) {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // ── Validation ────────────────────────────────────────────────────────
   const validate = () => {
     const newErrors = {};
     if (!nombre.trim()) newErrors.nombre = 'El nombre es requerido';
@@ -99,31 +135,47 @@ export default function ProductFormScreen({ navigation, route }) {
       newErrors.precio = 'Ingresa un precio válido';
     if (!costo || isNaN(Number(costo)) || Number(costo) <= 0)
       newErrors.costo = 'Ingresa un costo válido';
-    if (!stock || isNaN(Number(stock)) || Number(stock) < 0)
-      newErrors.stock = 'Ingresa un stock válido';
     if (tallasSeleccionadas.length === 0)
       newErrors.tallas = 'Selecciona al menos una talla';
+
+    // Validar stock > 0 solo al crear un producto nuevo
+    if (!isEditing) {
+      const hasStock = Object.values(stockPorTalla).some(
+        (v) => parseInt(v, 10) > 0
+      );
+      if (!hasStock) newErrors.stock = 'Al menos una talla debe tener stock';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // ── Save ───────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!validate()) return;
     setLoading(true);
+
+    // Convertir stockPorTalla de strings a numbers
+    const stockNum = {};
+    for (const [k, v] of Object.entries(stockPorTalla)) {
+      if (tallasSeleccionadas.includes(k)) {
+        stockNum[k] = Math.max(0, parseInt(v, 10) || 0);
+      }
+    }
 
     const productData = {
       nombre: nombre.trim(),
       descripcion: descripcion.trim(),
       precioVenta: Number(precio),
       costoAdquisicion: Number(costo),
-      stock: Number(stock),
+      stockPorTalla: stockNum,
       categoria,
       gender: categoria,
       tallasDisponibles: tallasSeleccionadas,
       talla: tallasSeleccionadas[0],
       imageUrl: images[0] ?? null,
       gallery: images,
-      bestseller: false,
+      bestseller: isEditing ? (editingProduct.bestseller ?? false) : false,
     };
 
     try {
@@ -151,7 +203,7 @@ export default function ProductFormScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Images */}
+          {/* ── Images ── */}
           <Text style={styles.label}>Imágenes del producto</Text>
           <ScrollView
             horizontal
@@ -182,7 +234,7 @@ export default function ProductFormScreen({ navigation, route }) {
             )}
           </ScrollView>
 
-          {/* Nombre */}
+          {/* ── Nombre ── */}
           <Field
             label="Nombre del producto *"
             value={nombre}
@@ -191,17 +243,17 @@ export default function ProductFormScreen({ navigation, route }) {
             error={errors.nombre}
           />
 
-          {/* Descripcion */}
+          {/* ── Descripción ── */}
           <Field
             label="Descripción"
             value={descripcion}
             onChangeText={setDescripcion}
-            placeholder="Describe el material, estilo, ocasión..."
+            placeholder="Material, estilo, ocasión..."
             multiline
             numberOfLines={3}
           />
 
-          {/* Precios */}
+          {/* ── Precios ── */}
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Field
@@ -217,7 +269,7 @@ export default function ProductFormScreen({ navigation, route }) {
             <View style={{ width: 12 }} />
             <View style={{ flex: 1 }}>
               <Field
-                label="Costo de adquisición *"
+                label="Costo adquisición *"
                 value={costo}
                 onChangeText={setCosto}
                 placeholder="0.00"
@@ -228,8 +280,8 @@ export default function ProductFormScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Margen preview */}
-          {precio && costo && !isNaN(Number(precio)) && !isNaN(Number(costo)) && Number(precio) > 0 && (
+          {/* Margin preview */}
+          {precio && costo && !isNaN(Number(precio)) && Number(precio) > 0 && (
             <View style={styles.marginPreview}>
               <Ionicons name="trending-up-outline" size={16} color={Colors.success} />
               <Text style={styles.marginText}>
@@ -238,26 +290,12 @@ export default function ProductFormScreen({ navigation, route }) {
                   ((Number(precio) - Number(costo)) / Number(precio)) *
                   100
                 ).toFixed(1)}
-                %{' '}
-                <Text style={styles.marginGain}>
-                  (+{APP_CONFIG.currency}
-                  {(Number(precio) - Number(costo)).toFixed(2)} por unidad)
-                </Text>
+                %
               </Text>
             </View>
           )}
 
-          {/* Stock */}
-          <Field
-            label="Stock disponible *"
-            value={stock}
-            onChangeText={setStock}
-            placeholder="0"
-            keyboardType="numeric"
-            error={errors.stock}
-          />
-
-          {/* Categoria */}
+          {/* ── Categoría ── */}
           <Text style={styles.label}>Categoría *</Text>
           <View style={styles.optionsRow}>
             {CATEGORY_OPTIONS.map((cat) => {
@@ -274,10 +312,7 @@ export default function ProductFormScreen({ navigation, route }) {
                     color={active ? '#fff' : Colors.textSecondary}
                   />
                   <Text
-                    style={[
-                      styles.optionText,
-                      active && styles.optionTextActive,
-                    ]}
+                    style={[styles.optionText, active && styles.optionTextActive]}
                   >
                     {cat.label}
                   </Text>
@@ -286,8 +321,8 @@ export default function ProductFormScreen({ navigation, route }) {
             })}
           </View>
 
-          {/* Tallas */}
-          <Text style={styles.label}>Tallas disponibles *</Text>
+          {/* ── Tallas + Stock por variante ── */}
+          <Text style={styles.label}>Variantes por Talla *</Text>
           {errors.tallas && (
             <Text style={styles.errorText}>{errors.tallas}</Text>
           )}
@@ -301,10 +336,7 @@ export default function ProductFormScreen({ navigation, route }) {
                   onPress={() => toggleTalla(talla)}
                 >
                   <Text
-                    style={[
-                      styles.tallaText,
-                      active && styles.tallaTextActive,
-                    ]}
+                    style={[styles.tallaText, active && styles.tallaTextActive]}
                   >
                     {talla}
                   </Text>
@@ -312,9 +344,45 @@ export default function ProductFormScreen({ navigation, route }) {
               );
             })}
           </View>
+
+          {/* ── Stock por talla (inputs individuales) ── */}
+          {tallasSeleccionadas.length > 0 && (
+            <View style={styles.stockSection}>
+              <View style={styles.stockHeader}>
+                <Text style={styles.stockSectionTitle}>Stock por Talla</Text>
+                <View style={styles.totalStockPill}>
+                  <Text style={styles.totalStockText}>
+                    Total: {totalStock} uds
+                  </Text>
+                </View>
+              </View>
+              {errors.stock && (
+                <Text style={styles.errorText}>{errors.stock}</Text>
+              )}
+              <View style={styles.stockGrid}>
+                {tallasSeleccionadas.map((talla) => (
+                  <View key={talla} style={styles.stockItem}>
+                    <View style={styles.stockTallaBadge}>
+                      <Text style={styles.stockTallaText}>{talla}</Text>
+                    </View>
+                    <TextInput
+                      style={styles.stockInput}
+                      value={stockPorTalla[talla] || '0'}
+                      onChangeText={(v) => updateTallaStock(talla, v)}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      placeholderTextColor={Colors.textLight}
+                      selectTextOnFocus
+                    />
+                    <Text style={styles.stockUnit}>uds</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </ScrollView>
 
-        {/* Save button */}
+        {/* ── Footer ── */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.cancelBtn}
@@ -348,7 +416,6 @@ export default function ProductFormScreen({ navigation, route }) {
   );
 }
 
-// Reusable field component
 function Field({
   label,
   error,
@@ -382,216 +449,119 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scroll: {
-    padding: 20,
-    paddingBottom: 8,
-  },
-  imagesRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  imageWrapper: {
-    position: 'relative',
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { padding: 20, paddingBottom: 8 },
+  imagesRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  imageWrapper: { position: 'relative' },
   productImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceAlt,
+    width: 90, height: 90, borderRadius: 12, backgroundColor: Colors.surfaceAlt,
   },
   mainBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: Colors.accent,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    position: 'absolute', bottom: 4, left: 4,
+    backgroundColor: Colors.accent, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
   },
-  mainBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '700',
-  },
+  mainBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   removeImgBtn: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#fff',
-    borderRadius: 11,
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: '#fff', borderRadius: 11,
   },
   addImageBtn: {
-    width: 90,
-    height: 90,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    width: 90, height: 90, borderRadius: 12,
+    borderWidth: 1.5, borderColor: Colors.accent, borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center', gap: 4,
   },
-  addImageText: {
-    fontSize: 11,
-    color: Colors.accent,
-    fontWeight: '600',
-  },
-  fieldWrapper: {
-    marginBottom: 16,
-  },
+  addImageText: { fontSize: 11, color: Colors.accent, fontWeight: '600' },
+  fieldWrapper: { marginBottom: 16 },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 6,
-    letterSpacing: 0.2,
+    fontSize: 13, fontWeight: '600', color: Colors.textSecondary,
+    marginBottom: 6, letterSpacing: 0.2,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14,
   },
-  inputError: {
-    borderColor: Colors.danger,
-  },
-  inputMultiline: {
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-  },
-  prefix: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    marginRight: 4,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.textPrimary,
-    paddingVertical: 12,
-  },
-  errorText: {
-    fontSize: 11,
-    color: Colors.danger,
-    marginTop: 4,
-    marginLeft: 2,
-  },
-  row: {
-    flexDirection: 'row',
-  },
+  inputError: { borderColor: Colors.danger },
+  inputMultiline: { alignItems: 'flex-start', paddingVertical: 10 },
+  prefix: { fontSize: 15, color: Colors.textSecondary, marginRight: 4 },
+  input: { flex: 1, fontSize: 15, color: Colors.textPrimary, paddingVertical: 12 },
+  errorText: { fontSize: 11, color: Colors.danger, marginTop: 4, marginLeft: 2 },
+  row: { flexDirection: 'row' },
   marginPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.successLight,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 16,
-    marginTop: -8,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#E8F5E9', borderRadius: 10, padding: 10,
+    marginBottom: 16, marginTop: -8,
   },
-  marginText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.success,
-  },
-  marginGain: {
-    fontWeight: '400',
-    color: Colors.success,
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
+  marginText: { fontSize: 13, fontWeight: '600', color: Colors.success },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   optionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  optionBtnActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  optionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  optionTextActive: {
-    color: '#fff',
-  },
+  optionBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  optionText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  optionTextActive: { color: '#fff' },
   tallaBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    width: 44, height: 44, borderRadius: 10,
+    borderWidth: 1.5, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface,
   },
-  tallaBtnActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+  tallaBtnActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  tallaText: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
+  tallaTextActive: { color: '#fff' },
+  // Stock por talla section
+  stockSection: {
+    backgroundColor: Colors.surface, borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: Colors.borderLight, marginBottom: 20,
   },
-  tallaText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textSecondary,
+  stockHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 12,
   },
-  tallaTextActive: {
-    color: '#fff',
+  stockSectionTitle: {
+    fontSize: 14, fontWeight: '700', color: Colors.textPrimary,
   },
+  totalStockPill: {
+    backgroundColor: Colors.accent + '20', borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  totalStockText: {
+    fontSize: 12, fontWeight: '700', color: Colors.accent,
+  },
+  stockGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  stockItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 10, padding: 8,
+    minWidth: 120,
+  },
+  stockTallaBadge: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  stockTallaText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  stockInput: {
+    flex: 1, fontSize: 16, fontWeight: '700', color: Colors.textPrimary,
+    textAlign: 'center', paddingVertical: 4,
+    borderBottomWidth: 1.5, borderBottomColor: Colors.border,
+  },
+  stockUnit: { fontSize: 11, color: Colors.textLight },
+  // Footer
   footer: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-    paddingBottom: 24,
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+    flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 24,
+    backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.borderLight,
   },
   cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
+    flex: 1, paddingVertical: 14, borderRadius: 14,
+    borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center',
   },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
+  cancelText: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary },
   saveBtn: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: Colors.primary,
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.primary,
   },
-  saveText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });

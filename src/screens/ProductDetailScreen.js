@@ -32,7 +32,7 @@ const AZ = {
 };
 
 export default function ProductDetailScreen({ route, navigation }) {
-  const { addToCart, cartDetails } = useInventory();
+  const { addToCart, cartDetails, getStockForSize } = useInventory();
   const item = route.params.item;
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -40,18 +40,22 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [sizeError, setSizeError] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const gallery = item.gallery || [item.imageUrl];
+  const gallery = (item.gallery && item.gallery.length > 0) ? item.gallery : [item.imageUrl].filter(Boolean);
   const tallasDisponibles = item.tallasDisponibles || [item.talla];
   const freeShipping = item.precioVenta >= APP_CONFIG.freeShippingMin;
+
+  const selectedSizeStock = selectedSize ? getStockForSize(item.id, selectedSize) : 0;
+  const canAdd = !!selectedSize && selectedSizeStock > 0;
 
   const handleAddToCart = () => {
     if (!selectedSize) {
       setSizeError(true);
       return;
     }
+    if (selectedSizeStock === 0) return;
     setSizeError(false);
     for (let i = 0; i < quantity; i++) {
-      addToCart(item.id);
+      addToCart(item.id, selectedSize);
     }
     Alert.alert(
       'Agregado al carrito',
@@ -71,9 +75,10 @@ export default function ProductDetailScreen({ route, navigation }) {
       setSizeError(true);
       return;
     }
+    if (selectedSizeStock === 0) return;
     setSizeError(false);
     for (let i = 0; i < quantity; i++) {
-      addToCart(item.id);
+      addToCart(item.id, selectedSize);
     }
     navigation.navigate('Checkout');
   };
@@ -81,6 +86,9 @@ export default function ProductDetailScreen({ route, navigation }) {
   const selectSize = (size) => {
     setSelectedSize(size);
     setSizeError(false);
+    // Cap quantity to available stock for the new size
+    const stock = getStockForSize(item.id, size);
+    setQuantity((prev) => Math.min(prev, stock) || 1);
   };
 
   // Delivery date estimate
@@ -251,12 +259,22 @@ export default function ProductDetailScreen({ route, navigation }) {
           <Text
             style={[
               styles.stockText,
-              item.stock <= 3 && styles.stockLow,
+              selectedSize
+                ? (selectedSizeStock === 0
+                    ? styles.stockAgotado
+                    : selectedSizeStock <= 3 && styles.stockLow)
+                : (item.stock <= 3 && styles.stockLow),
             ]}
           >
-            {item.stock <= 3
-              ? `¡Solo quedan ${item.stock} en stock!`
-              : 'En stock'}
+            {selectedSize
+              ? (selectedSizeStock === 0
+                  ? `Talla ${selectedSize} agotada`
+                  : selectedSizeStock <= 3
+                    ? `¡Solo quedan ${selectedSizeStock} en talla ${selectedSize}!`
+                    : `En stock — talla ${selectedSize}`)
+              : (item.stock <= 3
+                  ? `¡Solo quedan ${item.stock} en stock!`
+                  : 'En stock')}
           </Text>
 
           <View style={styles.divider} />
@@ -276,25 +294,32 @@ export default function ProductDetailScreen({ route, navigation }) {
                 sizeError && styles.sizeGridError,
               ]}
             >
-              {tallasDisponibles.map((size) => (
-                <TouchableOpacity
-                  key={size}
-                  style={[
-                    styles.sizeBtn,
-                    selectedSize === size && styles.sizeBtnActive,
-                  ]}
-                  onPress={() => selectSize(size)}
-                >
-                  <Text
+              {tallasDisponibles.map((size) => {
+                const sizeStock = getStockForSize(item.id, size);
+                const isOutOfStock = sizeStock === 0;
+                return (
+                  <TouchableOpacity
+                    key={size}
                     style={[
-                      styles.sizeBtnText,
-                      selectedSize === size && styles.sizeBtnTextActive,
+                      styles.sizeBtn,
+                      selectedSize === size && styles.sizeBtnActive,
+                      isOutOfStock && styles.sizeBtnDisabled,
                     ]}
+                    onPress={() => !isOutOfStock && selectSize(size)}
+                    disabled={isOutOfStock}
                   >
-                    {size}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.sizeBtnText,
+                        selectedSize === size && styles.sizeBtnTextActive,
+                        isOutOfStock && styles.sizeBtnTextDisabled,
+                      ]}
+                    >
+                      {size}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {sizeError && (
@@ -320,7 +345,7 @@ export default function ProductDetailScreen({ route, navigation }) {
               <Text style={styles.qtyValue}>{quantity}</Text>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(Math.min(item.stock, quantity + 1))}
+                onPress={() => setQuantity(Math.min(selectedSize ? getStockForSize(item.id, selectedSize) : item.stock, quantity + 1))}
               >
                 <Ionicons name="add" size={16} color={Colors.textPrimary} />
               </TouchableOpacity>
@@ -328,13 +353,25 @@ export default function ProductDetailScreen({ route, navigation }) {
           </View>
 
           {/* Action Buttons */}
-          <TouchableOpacity style={styles.addToCartBtn} onPress={handleAddToCart}>
-            <Ionicons name="cart-outline" size={18} color="#111" />
-            <Text style={styles.addToCartText}>Añadir al carrito</Text>
+          <TouchableOpacity
+            style={[styles.addToCartBtn, !canAdd && styles.btnDisabled]}
+            onPress={handleAddToCart}
+            disabled={!canAdd}
+          >
+            <Ionicons name="cart-outline" size={18} color={canAdd ? '#111' : Colors.textLight} />
+            <Text style={[styles.addToCartText, !canAdd && styles.btnDisabledText]}>
+              Añadir al carrito
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.buyNowBtn} onPress={handleBuyNow}>
-            <Text style={styles.buyNowText}>Comprar ahora</Text>
+          <TouchableOpacity
+            style={[styles.buyNowBtn, !canAdd && styles.btnDisabled]}
+            onPress={handleBuyNow}
+            disabled={!canAdd}
+          >
+            <Text style={[styles.buyNowText, !canAdd && styles.btnDisabledText]}>
+              Comprar ahora
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.divider} />
@@ -525,6 +562,7 @@ const styles = StyleSheet.create({
   // Stock
   stockText: { fontSize: 14, fontWeight: '500', color: Colors.success },
   stockLow: { color: Colors.danger },
+  stockAgotado: { color: Colors.danger, fontWeight: '600' },
 
   // Size selector
   sizeSection: { gap: 8 },
@@ -559,6 +597,15 @@ const styles = StyleSheet.create({
   sizeBtnActive: { borderColor: AZ.teal, borderWidth: 2, backgroundColor: '#E0F5F5' },
   sizeBtnText: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
   sizeBtnTextActive: { color: AZ.tealDark, fontWeight: '700' },
+  sizeBtnDisabled: {
+    backgroundColor: Colors.borderLight,
+    borderColor: Colors.border,
+    opacity: 0.45,
+  },
+  sizeBtnTextDisabled: {
+    color: Colors.textLight,
+    textDecorationLine: 'line-through',
+  },
   sizeErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sizeErrorText: { fontSize: 13, color: Colors.danger, fontWeight: '500' },
 
@@ -609,6 +656,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   buyNowText: { fontSize: 15, fontWeight: '600', color: '#FFF' },
+  btnDisabled: {
+    backgroundColor: Colors.border,
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  btnDisabledText: { color: Colors.textLight },
 
   // Description
   descSection: { gap: 6 },
