@@ -227,11 +227,19 @@ export function OrdersProvider({ children }) {
         const producto = inventoryItems.find((p) => p.id === orderItem.id);
         if (!producto) {
           problemas.push(`"${orderItem.nombre}" ya no existe en inventario.`);
-        } else if (producto.stock < orderItem.quantity) {
-          problemas.push(
-            `"${orderItem.nombre}": necesitas ${orderItem.quantity} unidad(es), ` +
-              `solo hay ${producto.stock} en stock.`
-          );
+        } else {
+          // Validar por talla si el producto tiene stockPorTalla
+          const available =
+            orderItem.talla && producto.stockPorTalla
+              ? producto.stockPorTalla[orderItem.talla] ?? 0
+              : producto.stock;
+          if (available < orderItem.quantity) {
+            const tallaInfo = orderItem.talla ? ` talla ${orderItem.talla}` : '';
+            problemas.push(
+              `"${orderItem.nombre}"${tallaInfo}: necesitas ${orderItem.quantity} unidad(es), ` +
+                `solo hay ${available} en stock.`
+            );
+          }
         }
       }
 
