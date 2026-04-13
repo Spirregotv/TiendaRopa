@@ -5,6 +5,7 @@ import { APP_CONFIG, PRODUCT_IMAGES } from '../constants/Config';
 const InventoryContext = createContext();
 
 const INVENTORY_KEY = '@tienda_inventory';
+const AUTH_KEY = '@tienda_session';
 
 /**
  * ─── ESTRUCTURA DE PRODUCTO ─────────────────────────────────────────────────
@@ -138,15 +139,28 @@ export function InventoryProvider({ children }) {
 
   const isAdmin = userRole === 'admin';
 
-  // ── Persistencia: hidratar inventario de AsyncStorage al montar ────────
+  // ── Persistencia: hidratar inventario + sesión de AsyncStorage al montar ─
   useEffect(() => {
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem(INVENTORY_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
+        const [storedInventory, storedSession] = await Promise.all([
+          AsyncStorage.getItem(INVENTORY_KEY),
+          AsyncStorage.getItem(AUTH_KEY),
+        ]);
+
+        if (storedInventory) {
+          const parsed = JSON.parse(storedInventory);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setRawItems(parsed);
+          }
+        }
+
+        if (storedSession) {
+          const { role, name, email } = JSON.parse(storedSession);
+          if (role) {
+            setUserRole(role);
+            setUserName(name || '');
+            setUserEmail(email || '');
           }
         }
       } catch (e) {
@@ -170,22 +184,32 @@ export function InventoryProvider({ children }) {
   const items = useMemo(() => rawItems.map(enrichItem), [rawItems]);
 
   // ── Auth ────────────────────────────────────────────────────────────────
+  const persistSession = (role, name, email) => {
+    AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ role, name, email })).catch(
+      (e) => console.warn('[Session] persist error:', e)
+    );
+  };
+
   const loginAsAdmin = () => {
     setUserRole('admin');
     setUserName('Administrador');
     setUserEmail('admin@fashionflow.com');
+    persistSession('admin', 'Administrador', 'admin@fashionflow.com');
   };
 
   const loginAsClient = (name, email) => {
+    const resolvedName = name || email.split('@')[0];
     setUserRole('client');
-    setUserName(name || email.split('@')[0]);
+    setUserName(resolvedName);
     setUserEmail(email);
+    persistSession('client', resolvedName, email);
   };
 
   const registerClient = (name, email) => {
     setUserRole('client');
     setUserName(name);
     setUserEmail(email);
+    persistSession('client', name, email);
   };
 
   const logout = () => {
@@ -193,6 +217,7 @@ export function InventoryProvider({ children }) {
     setUserName('');
     setUserEmail('');
     setCart([]);
+    AsyncStorage.removeItem(AUTH_KEY).catch(() => {});
   };
 
   // ── CRUD ────────────────────────────────────────────────────────────────
