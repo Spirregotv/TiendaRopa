@@ -13,7 +13,7 @@ import { APP_CONFIG } from '../constants/Config';
 import { useInventory } from '../context/InventoryContext';
 
 export default function HomeScreen({ navigation }) {
-  const { items, financials, isAdmin } = useInventory();
+  const { items, financials } = useInventory();
 
   return (
     <View style={styles.container}>
@@ -104,26 +104,27 @@ export default function HomeScreen({ navigation }) {
             />
             <Text style={styles.actionLabel}>Finanzas</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Gestión')}
-          >
-            <Ionicons
-              name="settings-outline"
-              size={28}
-              color={Colors.primary}
-            />
-            <Text style={styles.actionLabel}>Gestión</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Featured Items */}
-        <Text style={styles.sectionTitle}>Destacados</Text>
+        <Text style={styles.sectionTitle}>Últimos Productos</Text>
         {items.slice(0, 3).map((item) => (
           <View key={item.id} style={styles.featuredCard}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.featuredName}>{item.nombre}</Text>
-              <Text style={styles.featuredTalla}>Talla {item.talla}</Text>
+              <Text
+                style={[
+                  styles.featuredTalla,
+                  item.agotado && { color: Colors.danger },
+                  !item.agotado && item.stock <= APP_CONFIG.lowStockThreshold && { color: Colors.warning },
+                ]}
+              >
+                {item.agotado
+                  ? 'Agotado'
+                  : item.stock <= APP_CONFIG.lowStockThreshold
+                    ? `Stock bajo — ${item.stock} uds.`
+                    : `${item.stock} unidades`}
+              </Text>
             </View>
             <Text style={styles.featuredPrice}>
               {APP_CONFIG.currency}{item.precioVenta.toLocaleString()}

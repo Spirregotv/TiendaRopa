@@ -21,10 +21,23 @@ const PADDING = 16;
 const CARD_WIDTH = (width - PADDING * 2 - CARD_GAP) / 2;
 
 export default function StoreScreen({ navigation }) {
-  const { items, addToCart, cartDetails } = useInventory();
+  const { items, addToCart, cartDetails, getStockForSize } = useInventory();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  // Quick-add inteligente: si solo hay UNA talla con stock, agrega directo.
+  // Si hay varias tallas disponibles, manda al detalle para que el usuario elija.
+  const handleQuickAdd = (item) => {
+    const sizesWithStock = (item.tallasDisponibles || []).filter(
+      (t) => getStockForSize(item.id, t) > 0
+    );
+    if (sizesWithStock.length === 1) {
+      addToCart(item.id, sizesWithStock[0]);
+    } else {
+      navigation.navigate('ProductDetail', { item });
+    }
+  };
 
   const filteredItems = useMemo(() => {
     let filtered = items.filter((item) => item.stock > 0);
@@ -38,7 +51,7 @@ export default function StoreScreen({ navigation }) {
       filtered = filtered.filter(
         (item) =>
           item.nombre.toLowerCase().includes(q) ||
-          item.talla.toLowerCase().includes(q)
+          item.talla?.toLowerCase().includes(q)
       );
     }
 
@@ -156,7 +169,7 @@ export default function StoreScreen({ navigation }) {
         renderItem={({ item }) => (
           <ProductCard
             item={item}
-            onAddToCart={addToCart}
+            onAddToCart={handleQuickAdd}
             onPress={(product) =>
               navigation.navigate('ProductDetail', { item: product })
             }

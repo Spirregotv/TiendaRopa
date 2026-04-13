@@ -23,7 +23,7 @@ export default function ProductCard({ item, onAddToCart, onPress, cardWidth }) {
           style={styles.addBtn}
           onPress={(e) => {
             e.stopPropagation && e.stopPropagation();
-            onAddToCart(item.id);
+            onAddToCart(item);
           }}
           activeOpacity={0.7}
         >

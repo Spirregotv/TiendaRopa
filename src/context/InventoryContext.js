@@ -138,13 +138,13 @@ export function InventoryProvider({ children }) {
 
   const isAdmin = userRole === 'admin';
 
-  // ── Persistencia: hidratar inventario de AsyncStorage al montar ────────
+  // ── Persistencia: hidratar inventario de AsyncStorage al montar ──────────
   useEffect(() => {
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem(INVENTORY_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
+        const storedInventory = await AsyncStorage.getItem(INVENTORY_KEY);
+        if (storedInventory) {
+          const parsed = JSON.parse(storedInventory);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setRawItems(parsed);
           }
@@ -170,6 +170,7 @@ export function InventoryProvider({ children }) {
   const items = useMemo(() => rawItems.map(enrichItem), [rawItems]);
 
   // ── Auth ────────────────────────────────────────────────────────────────
+
   const loginAsAdmin = () => {
     setUserRole('admin');
     setUserName('Administrador');
@@ -177,8 +178,9 @@ export function InventoryProvider({ children }) {
   };
 
   const loginAsClient = (name, email) => {
+    const resolvedName = name || email.split('@')[0];
     setUserRole('client');
-    setUserName(name || email.split('@')[0]);
+    setUserName(resolvedName);
     setUserEmail(email);
   };
 
@@ -206,7 +208,7 @@ export function InventoryProvider({ children }) {
       categoria: item.gender || item.categoria || 'mujer',
       gender: item.gender || 'mujer',
       imageUrl: item.imageUrl || PRODUCT_IMAGES.blazer[0],
-      gallery: item.gallery || [PRODUCT_IMAGES.blazer[0]],
+      gallery: (item.gallery && item.gallery.length > 0) ? item.gallery : [item.imageUrl || PRODUCT_IMAGES.blazer[0]],
       tallasDisponibles: item.tallasDisponibles || ['M'],
       stockPorTalla: item.stockPorTalla || { M: Number(item.stock) || 0 },
     };

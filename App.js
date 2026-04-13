@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -28,6 +29,7 @@ import FinanceScreen from './src/screens/FinanceScreen';
 import OrdersScreen from './src/screens/Admin/OrdersScreen';
 import ProductFormScreen from './src/screens/Admin/ProductFormScreen';
 
+const RootStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 const ClientStack = createNativeStackNavigator();
 const ClientTab = createBottomTabNavigator();
@@ -213,19 +215,41 @@ function SalesHistoryBridge({ children }) {
 }
 
 // --- Root: Conditional navigation based on userRole ---
+// Usa un Stack raíz único para que React Navigation pueda hacer la transición
+// correctamente entre Auth/Admin/Client cuando cambia el estado de sesión.
+// (Patrón oficial de RN: https://reactnavigation.org/docs/auth-flow)
 function RootNavigator() {
-  const { userRole } = useInventory();
+  const { userRole, isHydrated } = useInventory();
 
-  if (userRole === null) {
-    return <AuthNavigator />;
+  if (!isHydrated) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
   }
 
-  if (userRole === 'admin') {
-    return <AdminNavigator />;
-  }
-
-  return <ClientNavigator />;
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
+      {userRole === null ? (
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      ) : userRole === 'admin' ? (
+        <RootStack.Screen name="Admin" component={AdminNavigator} />
+      ) : (
+        <RootStack.Screen name="Client" component={ClientNavigator} />
+      )}
+    </RootStack.Navigator>
+  );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+});
 
 export default function App() {
   return (
