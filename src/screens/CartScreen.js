@@ -46,7 +46,7 @@ export default function CartScreen({ navigation }) {
         <TouchableOpacity
           style={styles.qtyBtn}
           onPress={() =>
-            updateCartQuantity(item.id, item.quantity - 1)
+            updateCartQuantity(item.cartKey, item.quantity - 1)
           }
         >
           <Ionicons name="remove" size={16} color={Colors.textPrimary} />
@@ -55,7 +55,7 @@ export default function CartScreen({ navigation }) {
         <TouchableOpacity
           style={styles.qtyBtn}
           onPress={() =>
-            updateCartQuantity(item.id, item.quantity + 1)
+            updateCartQuantity(item.cartKey, item.quantity + 1)
           }
         >
           <Ionicons name="add" size={16} color={Colors.textPrimary} />
@@ -65,7 +65,7 @@ export default function CartScreen({ navigation }) {
       {/* Remove */}
       <TouchableOpacity
         style={styles.removeBtn}
-        onPress={() => removeFromCart(item.id)}
+        onPress={() => removeFromCart(item.cartKey)}
       >
         <Ionicons name="trash-outline" size={18} color={Colors.danger} />
       </TouchableOpacity>
@@ -87,7 +87,7 @@ export default function CartScreen({ navigation }) {
       {/* Cart Items */}
       <FlatList
         data={cartItems}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.cartKey}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         renderItem={renderCartItem}

@@ -138,11 +138,13 @@ export default function ProductFormScreen({ navigation, route }) {
     if (tallasSeleccionadas.length === 0)
       newErrors.tallas = 'Selecciona al menos una talla';
 
-    // Validar que al menos una talla tenga stock > 0
-    const hasStock = Object.values(stockPorTalla).some(
-      (v) => parseInt(v, 10) > 0
-    );
-    if (!hasStock) newErrors.stock = 'Al menos una talla debe tener stock';
+    // Validar stock > 0 solo al crear un producto nuevo
+    if (!isEditing) {
+      const hasStock = Object.values(stockPorTalla).some(
+        (v) => parseInt(v, 10) > 0
+      );
+      if (!hasStock) newErrors.stock = 'Al menos una talla debe tener stock';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -173,7 +175,7 @@ export default function ProductFormScreen({ navigation, route }) {
       talla: tallasSeleccionadas[0],
       imageUrl: images[0] ?? null,
       gallery: images,
-      bestseller: false,
+      bestseller: isEditing ? (editingProduct.bestseller ?? false) : false,
     };
 
     try {

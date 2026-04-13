@@ -32,7 +32,7 @@ const AZ = {
 };
 
 export default function ProductDetailScreen({ route, navigation }) {
-  const { addToCart, cartDetails } = useInventory();
+  const { addToCart, cartDetails, getStockForSize } = useInventory();
   const item = route.params.item;
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -51,7 +51,7 @@ export default function ProductDetailScreen({ route, navigation }) {
     }
     setSizeError(false);
     for (let i = 0; i < quantity; i++) {
-      addToCart(item.id);
+      addToCart(item.id, selectedSize);
     }
     Alert.alert(
       'Agregado al carrito',
@@ -73,7 +73,7 @@ export default function ProductDetailScreen({ route, navigation }) {
     }
     setSizeError(false);
     for (let i = 0; i < quantity; i++) {
-      addToCart(item.id);
+      addToCart(item.id, selectedSize);
     }
     navigation.navigate('Checkout');
   };
@@ -320,7 +320,7 @@ export default function ProductDetailScreen({ route, navigation }) {
               <Text style={styles.qtyValue}>{quantity}</Text>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(Math.min(item.stock, quantity + 1))}
+                onPress={() => setQuantity(Math.min(selectedSize ? getStockForSize(item.id, selectedSize) : item.stock, quantity + 1))}
               >
                 <Ionicons name="add" size={16} color={Colors.textPrimary} />
               </TouchableOpacity>
