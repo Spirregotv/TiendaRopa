@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, ActivityIndicator, Alert, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -132,8 +133,26 @@ function ClientNavigator() {
   );
 }
 
+// Placeholder vacío para el tab de logout (nunca se renderiza)
+function LogoutPlaceholder() {
+  return <View />;
+}
+
 // --- Admin Tabs ---
 function AdminTabs() {
+  const { logout } = useInventory();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Deseas cerrar sesión como administrador?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cerrar sesión', style: 'destructive', onPress: logout },
+      ]
+    );
+  };
+
   return (
     <AdminTab.Navigator screenOptions={TAB_STYLE}>
       <AdminTab.Screen
@@ -169,6 +188,24 @@ function AdminTabs() {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <AdminTab.Screen
+        name="Salir"
+        component={LogoutPlaceholder}
+        options={{
+          tabBarIcon: ({ size }) => (
+            <Ionicons name="log-out-outline" size={size} color={Colors.danger} />
+          ),
+          tabBarLabel: 'Salir',
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', color: Colors.danger },
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              {...props}
+              onPress={handleLogout}
+              style={[props.style, styles.logoutTab]}
+            />
           ),
         }}
       />
@@ -214,7 +251,18 @@ function SalesHistoryBridge({ children }) {
 
 // --- Root: Conditional navigation based on userRole ---
 function RootNavigator() {
-  const { userRole } = useInventory();
+  const { userRole, isHydrated } = useInventory();
+
+  // Esperar a que AsyncStorage cargue la sesión antes de decidir el navigator.
+  // Sin esto, userRole empieza en null → muestra login → luego salta al rol
+  // correcto, lo que causa el flash y la confusión de "me mandó al admin".
+  if (!isHydrated) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   if (userRole === null) {
     return <AuthNavigator />;
@@ -226,6 +274,20 @@ function RootNavigator() {
 
   return <ClientNavigator />;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  logoutTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export default function App() {
   return (
