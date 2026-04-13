@@ -23,9 +23,9 @@ const STATUS_CONFIG = {
     icon: 'time-outline',
     step: 0,
   },
-  'Confirmado': {
-    color: '#007185',
-    bg: '#E8F8F8',
+  'Pago Recibido': {
+    color: '#067D62',
+    bg: '#E8F5E9',
     icon: 'checkmark-circle-outline',
     step: 1,
   },
@@ -55,11 +55,11 @@ const STATUS_CONFIG = {
   },
 };
 
-const TIMELINE_STEPS = ['Confirmado', 'Preparando', 'Enviado', 'Entregado'];
+const TIMELINE_STEPS = ['Pago Recibido', 'En Preparación', 'Enviado', 'Entregado'];
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG['Confirmado'];
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG['Pago Recibido'];
   return (
     <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
       <Ionicons name={config.icon} size={14} color={config.color} />
@@ -70,7 +70,7 @@ const StatusBadge = ({ status }) => {
 
 // ─── Progress Timeline ──────────────────────────────────────────────────────
 const ShippingTimeline = ({ status }) => {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG['Confirmado'];
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG['Pago Recibido'];
   const currentStep = config.step;
 
   if (currentStep < 0) return null; // Cancelado — no mostrar timeline
@@ -256,7 +256,7 @@ export default function MyOrders({ navigation }) {
           </Text>
           <TouchableOpacity
             style={styles.shopBtn}
-            onPress={() => navigation.navigate('ProfileOverview')}
+            onPress={() => navigation.getParent()?.navigate('Tienda')}
           >
             <Ionicons name="storefront-outline" size={18} color="#FFF" />
             <Text style={styles.shopBtnText}>Ir a la tienda</Text>

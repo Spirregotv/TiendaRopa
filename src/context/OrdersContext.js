@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../constants/Config';
+
+const ORDERS_KEY = '@tienda_orders';
 
 /**
  * ─── ESTRUCTURA DE BASE DE DATOS ───────────────────────────────────────────
@@ -88,6 +91,30 @@ export const OXXO_ACCOUNT = '638180000112626198';
 
 export function OrdersProvider({ children }) {
   const [orders, setOrders] = useState([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // ── Cargar pedidos de AsyncStorage al montar ─────────────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem(ORDERS_KEY)
+      .then((stored) => {
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders(parsed);
+          }
+        }
+      })
+      .catch((e) => console.warn('[Orders] hydrate error:', e))
+      .finally(() => setIsHydrated(true));
+  }, []);
+
+  // ── Guardar pedidos cada vez que cambien ─────────────────────────────────
+  useEffect(() => {
+    if (!isHydrated) return;
+    AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders)).catch((e) =>
+      console.warn('[Orders] persist error:', e)
+    );
+  }, [orders, isHydrated]);
 
   // Place a new order from cart
   const placeOrder = ({ items, total, subtotal, shippingCost, paymentMethod, address, userId }) => {
@@ -254,7 +281,7 @@ export function OrdersProvider({ children }) {
 
   return (
     <OrdersContext.Provider
-      value={{ orders, orderStats, placeOrder, updateOrderStatus, getOrdersByUser, confirmarPago, deleteOrder, setArchiveFn }}
+      value={{ orders, orderStats, isHydrated, placeOrder, updateOrderStatus, getOrdersByUser, confirmarPago, deleteOrder, setArchiveFn }}
     >
       {children}
     </OrdersContext.Provider>
