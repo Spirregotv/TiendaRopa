@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -134,28 +134,6 @@ function ClientNavigator() {
   );
 }
 
-// Tab "Salir": muestra el Alert al montar y redirige al Inicio si cancela
-function LogoutPlaceholder({ navigation }) {
-  const { logout } = useInventory();
-
-  React.useEffect(() => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Deseas cerrar sesión como administrador?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-          onPress: () => navigation.navigate('Inicio'),
-        },
-        { text: 'Cerrar sesión', style: 'destructive', onPress: logout },
-      ]
-    );
-  }, []);
-
-  return <View style={{ flex: 1, backgroundColor: Colors.background }} />;
-}
-
 // --- Admin Tabs ---
 function AdminTabs() {
   return (
@@ -194,17 +172,6 @@ function AdminTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
-        }}
-      />
-      <AdminTab.Screen
-        name="Salir"
-        component={LogoutPlaceholder}
-        options={{
-          tabBarIcon: ({ size }) => (
-            <Ionicons name="log-out-outline" size={size} color={Colors.danger} />
-          ),
-          tabBarLabel: 'Salir',
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', color: Colors.danger },
         }}
       />
     </AdminTab.Navigator>
