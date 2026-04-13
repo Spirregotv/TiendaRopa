@@ -40,7 +40,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [sizeError, setSizeError] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const gallery = item.gallery || [item.imageUrl];
+  const gallery = (item.gallery && item.gallery.length > 0) ? item.gallery : [item.imageUrl].filter(Boolean);
   const tallasDisponibles = item.tallasDisponibles || [item.talla];
   const freeShipping = item.precioVenta >= APP_CONFIG.freeShippingMin;
 

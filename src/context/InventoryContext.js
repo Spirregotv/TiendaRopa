@@ -206,7 +206,7 @@ export function InventoryProvider({ children }) {
       categoria: item.gender || item.categoria || 'mujer',
       gender: item.gender || 'mujer',
       imageUrl: item.imageUrl || PRODUCT_IMAGES.blazer[0],
-      gallery: item.gallery || [PRODUCT_IMAGES.blazer[0]],
+      gallery: (item.gallery && item.gallery.length > 0) ? item.gallery : [item.imageUrl || PRODUCT_IMAGES.blazer[0]],
       tallasDisponibles: item.tallasDisponibles || ['M'],
       stockPorTalla: item.stockPorTalla || { M: Number(item.stock) || 0 },
     };
